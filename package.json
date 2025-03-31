@@ -16,6 +16,7 @@
     "license": "MIT",
     "description": "tSNE is a dimension reduction and vector projection method. It's main use is in visualizing high-dimensional vectors, such as text embeddings, in 2D or 3D plots.",
     "devDependencies": {
-        "typescript": "^5.8.2"
+        "typescript": "^5.8.2",
+        "vitest": "^3.1.1"
     }
 }
