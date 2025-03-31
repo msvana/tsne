@@ -1,0 +1,17 @@
+{
+    "name": "tsne",
+    "version": "0.0.1",
+    "main": "dist/index.js",
+    "scripts": {
+        "test": "echo Hi"
+    },
+    "keywords": [
+        "ml",
+        "tsne",
+        "dimension reduction",
+        "embeddings"
+    ],
+    "author": "Milos Svana <milos.svana@mailfence.com>",
+    "license": "MIT",
+    "description": "tSNE is a dimension reduction and vector projection method. It's main use is in visualizing high-dimensional vectors, such as text embeddings, in 2D or 3D plots."
+}
