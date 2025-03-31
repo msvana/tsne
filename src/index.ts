@@ -34,6 +34,8 @@ export class TSNE {
         let momentum;
         let Y = this.#initRandomProjection();
         let YPrev = structuredClone(Y);
+
+        return Y;
     }
 
     #validateInput(X: number[][]) {
@@ -132,7 +134,7 @@ export class TSNE {
     #initRandomProjection(): number[][] {
         const Y: number[][] = new Array(this.#n);
 
-        for (let i = 0; i < this.#n, i++) {
+        for (let i = 0; i < this.#n; i++) {
             Y[i] = new Array(this.#config.nDims);
 
             for(let j = 0; j < this.#config.nDims; j++) {
