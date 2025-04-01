@@ -53,10 +53,10 @@ export class TSNE {
                     YNew[j][k] += gradient[j * this.#config.nDims + k] * this.#config.learningRate;
                     YNew[j][k] += (Y[j][k] - YPrev[j][k]) * momentum;
                 }
-
-                YPrev = Y;
-                Y = YNew;
             }
+
+            YPrev = Y;
+            Y = YNew;
         }
 
         return Y;
@@ -107,7 +107,7 @@ export class TSNE {
                     continue;
                 }
 
-                distance = this.#squaredEuclideanDistance(X[i], X[j]);
+                distance = squaredEuclideanDistance(X[i], X[j]);
                 distances[i * n + j] = distance;
                 distances[j * n + i] = distance;
             }
@@ -205,12 +205,13 @@ export class TSNE {
     #getGradient(Y: number[][]): number[] {
         const gradient = new Array(this.#n * this.#config.nDims).fill(0);
         const projectedAffinities = this.#getProjectedAffinities(Y);
+
         let coef: number;
 
         for (let i = 0; i < this.#n; i++) {
             for (let j = 0; j < this.#n; j++) {
                 coef = this.#affinities[i][j] - projectedAffinities[i * this.#n + j];
-                coef *= 1 / (1 - this.#squaredEuclideanDistance(Y[i], Y[j]));
+                coef *= 1 / (1 + squaredEuclideanDistance(Y[i], Y[j]));
 
                 for (let k = 0; k < this.#config.nDims; k++) {
                     gradient[i * this.#config.nDims + k] += 4 * coef * (Y[i][k] - Y[j][k]);
@@ -219,18 +220,6 @@ export class TSNE {
         }
 
         return gradient;
-    }
-
-    #squaredEuclideanDistance(a: number[], b: number[]): number {
-        let sum: number = 0;
-        let dimDifference: number;
-
-        for (let i = 0; i < a.length; i++) {
-            dimDifference = a[i] - b[i];
-            sum += dimDifference * dimDifference;
-        }
-
-        return sum;
     }
 
     #getInitialSigmaUpperBound(): number {
@@ -268,21 +257,21 @@ export class TSNE {
     }
 
     #getProjectedAffinities(Y: number[][]): number[] {
-        const affinities = new Array(this.#n * this.#n);
-        const sums = new Array(this.#n);
+        const affinities = new Array(this.#n * this.#n).fill(0);
+        const sums = new Array(this.#n).fill(0);
         let distance: number;
         let affinity: number;
 
         for (let i = 0; i < this.#n; i++) {
-            for (let j = i + i; j < this.#n; j++) {
+            for (let j = i + 1; j < this.#n; j++) {
                 if (i === j) {
                     continue;
                 }
 
-                distance = this.#squaredEuclideanDistance(Y[i], Y[j]);
+                distance = squaredEuclideanDistance(Y[i], Y[j]);
                 affinity = 1 / (1 + distance);
-                affinities[i + this.#n + j] = affinity;
-                affinities[j + this.#n + i] = affinity;
+                affinities[i * this.#n + j] = affinity;
+                affinities[j * this.#n + i] = affinity;
                 sums[i] += affinity;
                 sums[j] += affinity;
             }
@@ -295,5 +284,34 @@ export class TSNE {
         }
 
         return affinities;
+    }
+}
+
+export function squaredEuclideanDistance(a: number[], b: number[]): number {
+    let sum: number = 0;
+    let dimDifference: number;
+
+    for (let i = 0; i < a.length; i++) {
+        dimDifference = a[i] - b[i];
+        sum += dimDifference * dimDifference;
+    }
+
+    return sum;
+}
+
+function printMatrix(matrix: number[], nRows: number) {
+    const nCols = matrix.length / nRows;
+
+    console.log("---");
+
+    for (let i = 0; i < nRows; i++) {
+        const row = matrix.slice(i * nCols, (i + 1) * nCols);
+        let rowOutput = "";
+
+        for (let j = 0; j < nCols; j++) {
+            rowOutput += `${row[j].toFixed(3)} `;
+        }
+
+        console.log(rowOutput);
     }
 }

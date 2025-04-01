@@ -4,7 +4,7 @@
     "main": "dist/index.js",
     "scripts": {
         "build": "tsc",
-        "test": "echo Hi"
+        "test": "vitest tests/"
     },
     "keywords": [
         "ml",
