@@ -1,5 +1,8 @@
+import * as mnist from "mnist";
 import { expect, test } from "vitest";
 import { TSNE, squaredEuclideanDistance } from "../src/index";
+
+const mnistSet = mnist.set(750, 0).training;
 
 async function getEmbeddings(texts: string[]): Promise<number[][]> {
     const response = await fetch("https://embeddings.swarm.svana.name/embeddings", {
@@ -58,4 +61,10 @@ test("sentiment embeddings", async () => {
     expect(distPOS).toBeLessThan(distNEUT);
     expect(distPOS).toBeLessThan(distNEG);
     expect(distPOS).toBeLessThan(distVNEG);
+});
+
+test("loads mnist dataset", () => {
+    const input = mnistSet.map((item: any) => item.input);
+    const tsne = new TSNE();
+    tsne.transform(input);
 });
