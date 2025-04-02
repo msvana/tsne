@@ -17,7 +17,12 @@ export class DataValidationError extends Error {}
 export class TSNE {
     #config: TSNEConfig;
     #n: number;
+
     #distances: number[];
+    #distancesY: number[];
+    #invertedDistancesY: number[];
+    #projectedAffinities: number[];
+
     #sigmas: number[];
     #affinities: number[][];
     #sigmasMaxIterations: number = 50;
@@ -29,8 +34,20 @@ export class TSNE {
     transform(X: number[][]): number[][] {
         this.#validateInput(X);
         this.#n = X.length;
-        this.#distances = this.#getPairwiseDistances(X);
+
+        this.#distances = new Array(this.#n * this.#n).fill(0);
+        this.#distancesY = new Array(this.#n * this.#n).fill(0);
+        this.#invertedDistancesY = new Array(this.#n * this.#n).fill(0);
+        this.#projectedAffinities = new Array(this.#n * this.#n).fill(0);
+
+        console.time("pairwise distances");
+        this.#getPairwiseDistances(X, this.#distances);
+        console.timeEnd("pairwise distances");
+
+        console.time("find sigmas");
         this.#sigmas = this.#findBestSigmas();
+        console.timeEnd("find sigmas");
+
         this.#affinities = this.#getSymmetricAffinities();
 
         let momentum: number;
@@ -40,6 +57,7 @@ export class TSNE {
         let YPrev = structuredClone(Y);
         let YNew: number[][];
 
+        console.time("gd");
         for (let i = 0; i < this.#config.nIter; i++) {
             momentum = this.#getMomentum(i);
             gradient = this.#getGradient(Y);
@@ -58,6 +76,7 @@ export class TSNE {
             YPrev = Y;
             Y = YNew;
         }
+        console.timeEnd("gd");
 
         return Y;
     }
@@ -94,38 +113,34 @@ export class TSNE {
         }
     }
 
-    #getPairwiseDistances(X: number[][]): number[] {
+    #getPairwiseDistances(X: number[][], target: number[]) {
         const n = X.length;
-        const distances = new Array(n * n);
-
         let distance: number;
 
         for (let i = 0; i < n; i++) {
             for (let j = i; j < n; j++) {
                 if (i === j) {
-                    distances[i * n + j] = 0;
+                    target[i * n + j] = 0;
                     continue;
                 }
 
                 distance = squaredEuclideanDistance(X[i], X[j]);
-                distances[i * n + j] = distance;
-                distances[j * n + i] = distance;
+                target[i * n + j] = distance;
+                target[j * n + i] = distance;
             }
         }
-
-        return distances;
     }
 
     #findBestSigmas(): number[] {
         const initialLowerBound = 1e-3;
         const initialUpperBound = this.#getInitialSigmaUpperBound();
         const sigmas: number[] = new Array(this.#n);
+        const affinities: number[] = new Array(this.#n);
 
         let lowerBound: number;
         let upperBound: number;
         let sigma: number;
         let pointDistances: number[];
-        let affinities: number[];
         let perplexity: number;
 
         for (let i = 0; i < this.#n; i++) {
@@ -135,10 +150,10 @@ export class TSNE {
 
             for (let j = 0; j < this.#sigmasMaxIterations; j++) {
                 sigma = (upperBound + lowerBound) / 2;
-                affinities = this.#getAffinities(pointDistances, sigma, i);
+                this.#getAffinities(pointDistances, sigma, i, affinities);
                 perplexity = this.#getPerplexity(affinities);
-                
-                if (Math.abs(perplexity - this.#config.perplexity) <= 1e-6) {
+
+                if (Math.abs(perplexity - this.#config.perplexity) <= 1e-3) {
                     break;
                 }
 
@@ -152,7 +167,7 @@ export class TSNE {
             sigmas[i] = sigma;
         }
 
-        return sigmas;
+        return Array.from(sigmas);
     }
 
     #getSymmetricAffinities(): number[][] {
@@ -162,7 +177,8 @@ export class TSNE {
 
         for (let i = 0; i < this.#n; i++) {
             pointDistances = this.#distances.slice(i * this.#n, (i + 1) * this.#n);
-            affinities[i] = this.#getAffinities(pointDistances, this.#sigmas[i], i);
+            affinities[i] = new Array(this.#n);
+            this.#getAffinities(pointDistances, this.#sigmas[i], i, affinities[i]);
             symmetricAffinities[i] = new Array(this.#n).fill(0);
         }
 
@@ -203,15 +219,17 @@ export class TSNE {
     }
 
     #getGradient(Y: number[][]): number[] {
+        this.#getPairwiseDistances(Y, this.#distancesY);
+        invertedDistances(this.#distancesY, this.#n, this.#invertedDistancesY);
         const gradient = new Array(this.#n * this.#config.nDims).fill(0);
-        const projectedAffinities = this.#getProjectedAffinities(Y);
+        this.#updateProjectedAffinities();
 
         let coef: number;
 
         for (let i = 0; i < this.#n; i++) {
             for (let j = 0; j < this.#n; j++) {
-                coef = this.#affinities[i][j] - projectedAffinities[i * this.#n + j];
-                coef *= 1 / (1 + squaredEuclideanDistance(Y[i], Y[j]));
+                coef = this.#affinities[i][j] - this.#projectedAffinities[i * this.#n + j];
+                coef *= this.#invertedDistancesY[i * this.#n + j];
 
                 for (let k = 0; k < this.#config.nDims; k++) {
                     gradient[i * this.#config.nDims + k] += 4 * coef * (Y[i][k] - Y[j][k]);
@@ -228,61 +246,50 @@ export class TSNE {
         return upperBound;
     }
 
-    #getAffinities(pointDistances: number[], sigma: number, rowNo: number): number[] {
-        const affinities = new Array(this.#n);
+    #getAffinities(
+        pointDistances: number[],
+        sigma: number,
+        rowNo: number,
+        affinitiesOut: number[],
+    ) {
         let sum = 0;
+        const denominator = 2 * sigma * sigma;
 
         for (let i = 0; i < this.#n; i++) {
             if (i === rowNo) {
-                affinities[i] = 0;
+                affinitiesOut[i] = 0;
                 continue;
             }
 
-            affinities[i] = Math.exp(-pointDistances[i] / (2 * sigma * sigma));
-            sum += affinities[i];
+            affinitiesOut[i] = Math.exp(-pointDistances[i] / denominator);
+            sum += affinitiesOut[i];
         }
 
-        return affinities.map((a) => a / sum);
+        for (let i = 0; i < this.#n; i++) {
+            affinitiesOut[i] = affinitiesOut[i] / sum;
+        }
     }
 
     #getPerplexity(affinities: number[]): number {
         let H = 0;
 
-        for (const p of affinities) {
-            H -= p * Math.log2(p + 1e-10);
+        for (let i = 0; i < affinities.length; i++) {
+            H -= affinities[i] * Math.log2(affinities[i] + 1e-10);
         }
 
-        const perplexity = Math.pow(2, H);
-        return perplexity;
+        return Math.pow(2, H);
     }
 
-    #getProjectedAffinities(Y: number[][]): number[] {
-        const affinities = new Array(this.#n * this.#n).fill(0);
+    #updateProjectedAffinities() {
         let sum = 0;
-        let distance: number;
-        let affinity: number;
 
-        for (let i = 0; i < this.#n; i++) {
-            for (let j = i + 1; j < this.#n; j++) {
-                if (i === j) {
-                    continue;
-                }
-
-                distance = squaredEuclideanDistance(Y[i], Y[j]);
-                affinity = 1 / (1 + distance);
-                affinities[i * this.#n + j] = affinity;
-                affinities[j * this.#n + i] = affinity;
-                sum += 2 * affinity;
-            }
+        for (let i = 0; i < this.#projectedAffinities.length; i++) {
+            sum += this.#invertedDistancesY[i];
         }
 
-        for (let i = 0; i < Y.length; i++) {
-            for (let j = 0; j < Y.length; j++) {
-                affinities[i * this.#n + j] /= sum;
-            }
+        for (let i = 0; i < this.#projectedAffinities.length; i++) {
+            this.#projectedAffinities[i] = this.#invertedDistancesY[i] / sum;
         }
-
-        return affinities;
     }
 }
 
@@ -296,6 +303,18 @@ export function squaredEuclideanDistance(a: number[], b: number[]): number {
     }
 
     return sum;
+}
+
+export function invertedDistances(distances: number[], n: number, target: number[]) {
+    let d: number;
+
+    for (let i = 0; i < n; i++) {
+        for (let j = i; j < n; j++) {
+            d = 1 / (1 + distances[i * n + j]);
+            target[i * n + j] = d;
+            target[j * n + i] = d;
+        }
+    }
 }
 
 function printMatrix(matrix: number[], nRows: number) {

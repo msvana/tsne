@@ -5,7 +5,7 @@
     "scripts": {
         "build": "tsc",
         "build-demo": "vite build --emptyOutDir",
-        "test": "vitest tests/"
+        "test": "vitest"
     },
     "keywords": [
         "ml",
