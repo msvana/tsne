@@ -50,7 +50,7 @@ export class TSNE {
 
                 for (let k = 0; k < this.#config.nDims; k++) {
                     YNew[j][k] = Y[j][k];
-                    YNew[j][k] += gradient[j * this.#config.nDims + k] * this.#config.learningRate;
+                    YNew[j][k] -= gradient[j * this.#config.nDims + k] * this.#config.learningRate;
                     YNew[j][k] += (Y[j][k] - YPrev[j][k]) * momentum;
                 }
             }
@@ -137,7 +137,7 @@ export class TSNE {
                 sigma = (upperBound + lowerBound) / 2;
                 affinities = this.#getAffinities(pointDistances, sigma, i);
                 perplexity = this.#getPerplexity(affinities);
-
+                
                 if (Math.abs(perplexity - this.#config.perplexity) <= 1e-6) {
                     break;
                 }
@@ -258,7 +258,7 @@ export class TSNE {
 
     #getProjectedAffinities(Y: number[][]): number[] {
         const affinities = new Array(this.#n * this.#n).fill(0);
-        const sums = new Array(this.#n).fill(0);
+        let sum = 0;
         let distance: number;
         let affinity: number;
 
@@ -272,14 +272,13 @@ export class TSNE {
                 affinity = 1 / (1 + distance);
                 affinities[i * this.#n + j] = affinity;
                 affinities[j * this.#n + i] = affinity;
-                sums[i] += affinity;
-                sums[j] += affinity;
+                sum += 2 * affinity;
             }
         }
 
         for (let i = 0; i < Y.length; i++) {
             for (let j = 0; j < Y.length; j++) {
-                affinities[i * this.#n + j] /= sums[i];
+                affinities[i * this.#n + j] /= sum;
             }
         }
 
