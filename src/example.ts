@@ -5,7 +5,7 @@ const dataset = mnist.default.set(250, 0).training;
 const inputs = dataset.map((item: any) => item.input);
 const classes = dataset.map((item: any) => item.output.indexOf(1));
 
-const tsne = new TSNE({ nIter: 500, perplexity: 50, learningRate: 10 });
+const tsne = new TSNE({ nIter: 100, perplexity: 30, learningRate: 10 });
 
 const projections = tsne.transform(inputs);
 const chartContainer = document.getElementById("chart");
