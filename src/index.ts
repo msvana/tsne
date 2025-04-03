@@ -38,14 +38,8 @@ export class TSNE {
         this.#n = X.length;
 
         this.#distances = new Array(this.#n * this.#n).fill(0);
-
-        console.time("pairwise distances");
         this.#getPairwiseDistances(X, this.#distances);
-        console.timeEnd("pairwise distances");
-
-        console.time("find sigmas");
         this.#sigmas = this.#findBestSigmas();
-        console.timeEnd("find sigmas");
 
         this.#affinities = this.#getSymmetricAffinities();
         this.#distancesY = new Array(this.#n * this.#n).fill(0);
@@ -59,7 +53,6 @@ export class TSNE {
         let YPrev = structuredClone(Y);
         let YNew = structuredClone(Y);
 
-        console.time("gd");
         for (let i = 0; i < this.#config.nIter; i++) {
             momentum = this.#getMomentum(i);
             this.#updateGradient(Y);
@@ -76,7 +69,6 @@ export class TSNE {
                 }
             }
         }
-        console.timeEnd("gd");
 
         return Y;
     }
