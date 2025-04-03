@@ -18,14 +18,16 @@ export class TSNE {
     #config: TSNEConfig;
     #n: number;
 
+    #sigmas: number[];
+    #affinities: number[][];
+    #sigmasMaxIterations: number = 50;
+
     #distances: number[];
     #distancesY: number[];
     #invertedDistancesY: number[];
     #projectedAffinities: number[];
 
-    #sigmas: number[];
-    #affinities: number[][];
-    #sigmasMaxIterations: number = 50;
+    #gradient: number[];
 
     constructor(config: TSNEConfig = {}) {
         this.#config = { ...defaultConfig, ...config };
@@ -36,9 +38,6 @@ export class TSNE {
         this.#n = X.length;
 
         this.#distances = new Array(this.#n * this.#n).fill(0);
-        this.#distancesY = new Array(this.#n * this.#n).fill(0);
-        this.#invertedDistancesY = new Array(this.#n * this.#n).fill(0);
-        this.#projectedAffinities = new Array(this.#n * this.#n).fill(0);
 
         console.time("pairwise distances");
         this.#getPairwiseDistances(X, this.#distances);
@@ -49,32 +48,33 @@ export class TSNE {
         console.timeEnd("find sigmas");
 
         this.#affinities = this.#getSymmetricAffinities();
+        this.#distancesY = new Array(this.#n * this.#n).fill(0);
+        this.#invertedDistancesY = new Array(this.#n * this.#n).fill(0);
+        this.#projectedAffinities = new Array(this.#n * this.#n).fill(0);
+        this.#gradient = new Array(this.#n * this.#config.nDims);
 
         let momentum: number;
-        let gradient: number[];
 
         let Y = this.#initRandomProjection();
         let YPrev = structuredClone(Y);
-        let YNew: number[][];
+        let YNew = structuredClone(Y);
 
         console.time("gd");
         for (let i = 0; i < this.#config.nIter; i++) {
             momentum = this.#getMomentum(i);
-            gradient = this.#getGradient(Y);
-            YNew = new Array(this.#n);
+            this.#updateGradient(Y);
 
             for (let j = 0; j < this.#n; j++) {
-                YNew[j] = new Array(this.#config.nDims);
-
                 for (let k = 0; k < this.#config.nDims; k++) {
                     YNew[j][k] = Y[j][k];
-                    YNew[j][k] -= gradient[j * this.#config.nDims + k] * this.#config.learningRate;
+                    YNew[j][k] -=
+                        this.#gradient[j * this.#config.nDims + k] * this.#config.learningRate;
                     YNew[j][k] += (Y[j][k] - YPrev[j][k]) * momentum;
+
+                    YPrev[j][k] = Y[j][k];
+                    Y[j][k] = YNew[j][k];
                 }
             }
-
-            YPrev = Y;
-            Y = YNew;
         }
         console.timeEnd("gd");
 
@@ -218,26 +218,26 @@ export class TSNE {
         return momentum;
     }
 
-    #getGradient(Y: number[][]): number[] {
+    #updateGradient(Y: number[][]) {
         this.#getPairwiseDistances(Y, this.#distancesY);
         invertedDistances(this.#distancesY, this.#n, this.#invertedDistancesY);
-        const gradient = new Array(this.#n * this.#config.nDims).fill(0);
         this.#updateProjectedAffinities();
+        this.#gradient.fill(0);
 
         let coef: number;
+        let idx: number;
 
         for (let i = 0; i < this.#n; i++) {
             for (let j = 0; j < this.#n; j++) {
-                coef = this.#affinities[i][j] - this.#projectedAffinities[i * this.#n + j];
-                coef *= this.#invertedDistancesY[i * this.#n + j];
+                idx = i * this.#n + j;
+                coef = this.#affinities[i][j] - this.#projectedAffinities[idx];
+                coef *= this.#invertedDistancesY[idx];
 
                 for (let k = 0; k < this.#config.nDims; k++) {
-                    gradient[i * this.#config.nDims + k] += 4 * coef * (Y[i][k] - Y[j][k]);
+                    this.#gradient[i * this.#config.nDims + k] += 4 * coef * (Y[i][k] - Y[j][k]);
                 }
             }
         }
-
-        return gradient;
     }
 
     #getInitialSigmaUpperBound(): number {
