@@ -1,7 +1,11 @@
 {
-    "name": "tsne",
+    "name": "msvana-tsne",
     "version": "0.0.1",
     "main": "dist/index.js",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/msvana/tsne.git"
+    },
     "scripts": {
         "build": "tsc",
         "build-demo": "vite build --emptyOutDir",
