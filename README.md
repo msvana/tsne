@@ -7,6 +7,9 @@ embeddings. At its core tSNE attempt to preserve distances between close points.
 Check out [the original paper](https://lvdmaaten.github.io/publications/papers/JMLR_2008.pdf)
 to learn more.
 
+One of the main benefits of this implementation is that it doesn't require any external 
+dependencies.
+
 ## Usage example
 
 ```js
