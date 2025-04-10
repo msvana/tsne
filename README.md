@@ -35,6 +35,6 @@ The TSNE constructor accepts a configuration object. All properties of this obje
 - `perplexity` (default `30`): Roughly equivalent to the number of neighboring points 
     to consider for distance preservation. A value between 10 and 50 is recommended. 
 - `nIter` (default `100`)
-- `learningRage` (default `1`): recommended values are 1, 10, or even 100
+- `learningRate` (default `1`): recommended values are 1, 10, or even 100
 
 
