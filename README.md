@@ -25,7 +25,7 @@ const tsne = new TSNE({ nIter: 200, perplexity: 30, learningRate: 10 });
 const projectedEmbeddings: number[][] = tsne.transform(embeddings);
 ```
 
-You can find an MNIST visualization demo in the [demo](https://github.com/msvana/tsne/tree/main/demo) directory.
+You can find a simple MNIST visualization demo at https://github.com/msvana/tsne-demo
 
 ## Configuration
 
